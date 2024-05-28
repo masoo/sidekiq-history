@@ -45,19 +45,19 @@ module Sidekiq
   end
 
   module History
-    LIST_KEY = :history
+    LIST_KEY = "history"
 
     def self.reset_history(options = {})
       Sidekiq.redis do |c|
-        c.multi do
-          c.del(LIST_KEY)
-          c.set('stat:history', 0) if options[:counter] || options['counter']
-        end
+        c.call("MULTI")
+        c.call("DEL", LIST_KEY)
+        c.call("SET", 'stat:history', 0) if options[:counter] || options['counter']
+        c.call("EXEC")
       end
     end
 
     def self.count
-      Sidekiq.redis { |r| r.zcard(LIST_KEY) }
+      Sidekiq.redis { |c| c.call("ZCARD", LIST_KEY) }
     end
 
     class HistorySet < Sidekiq::JobSet

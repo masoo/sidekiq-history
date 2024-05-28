@@ -29,25 +29,24 @@ module Sidekiq
 
         Sidekiq.redis do |conn|
           # migration of list to set for backwards compatibility after v0.0.4
-          if conn.type(LIST_KEY) == 'list'
-            length = conn.llen(LIST_KEY)
-            list = conn.lrange(LIST_KEY, 0, length)
-            conn.del(LIST_KEY)
+          if conn.call("TYPE" , LIST_KEY) == 'list'
+            length = conn.call("LLEN", LIST_KEY)
+            list = conn.call("LRANGE", LIST_KEY, 0, length)
+            conn.call("DEL", LIST_KEY)
             list.each do |entry|
               migrated_data = JSON.parse(entry)
               if record_history(job_class) == true
-                conn.zadd(LIST_KEY, data[:started_at].to_f,
-                          Sidekiq.dump_json(migrated_data))
+                conn.call("ZADD", LIST_KEY, data[:started_at].to_f, Sidekiq.dump_json(migrated_data))
               end
             end
           end
 
           # regular storage of history
           if record_history(job_class) == true
-            conn.zadd(LIST_KEY, data[:started_at].to_f, Sidekiq.dump_json(data))
+            conn.call("ZADD", LIST_KEY, data[:started_at].to_f, Sidekiq.dump_json(data))
           end
           unless Sidekiq.history_max_count == false
-            conn.zremrangebyrank(LIST_KEY, 0, -(Sidekiq.history_max_count + 1))
+            conn.call("ZREMRANGEBYRANK", LIST_KEY, 0, -(Sidekiq.history_max_count + 1))
           end
         end
 
